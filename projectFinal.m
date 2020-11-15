@@ -9,7 +9,7 @@ clc;
 load('WP.mat')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% USER INPUTS
+%% USER INPUTS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % h  = 0.1;    % sampling time [s]
 % Ns = 10000;  % no. of samples
@@ -103,7 +103,7 @@ Bu = @(u_r,delta) [ (1-t_thr)  -u_r^2 * X_delta2 * delta
                         0      -u_r^2 * N_delta            ];
                     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                    
-% Heading Controller
+%% Heading Controller
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % rudder control law
@@ -176,17 +176,17 @@ yp_int = 0;
 s_r_psi = 0.5 * pi/180; % Standard deviation of heading measurement noise
 s_r_r = 0.1 * pi/180; % Standard deviation of heading rate measurement noise
 % R = [s_r_psi^2 0; 0 s_r_r^2]; % Measurement noise covariance matrix
-R = s_r_psi^2;
+Rkf = s_r_psi^2;
 
-s_q_psi = s_r_psi; % Standard deviation of heading plant model noise
+% s_q_psi = s_r_psi; % Standard deviation of heading plant model noise
 s_q_r = s_r_r; % Standard deviation of heading rate plant model noise
 s_q_b = 0.01; % Standard deviation of rudder bias plant model noise
-Q = [s_q_psi 0 0; 0 s_r_r 0; 0 0 s_q_b]; % Plant model noise covariance matrix
+Qkf = [s_r_r 0; 0 s_q_b]; % Plant model noise covariance matrix
 
 Ac = [0 1 0; 0 -1/T_nomoto -K/T_nomoto; 0 0 0];
 Bc = [0; K/T_nomoto; 0];
 Ec = [0 0; 1 0; 0 1];
-Cc = [1; 0; 0]';
+Cc = [1; 0; 0];
 
 [~, Bkf] = c2d(Ac,Bc,h);
 [Akf, Ekf] = c2d(Ac,Ec,h);
@@ -196,7 +196,7 @@ x_pred = [eta(3); nu(3); 0];
 P_pred = diag([0.1, 0.05, 0.01]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% MAIN LOOP
+%% MAIN LOOP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 simdata = zeros(Ns+1,22);                % table of simulation data
 
@@ -284,13 +284,13 @@ for i=1:Ns+1
     psi_noisy = eta(3) + normrnd(0, s_r_psi);
     r_noisy = nu(3) + normrnd(0, s_r_r);
     
-    K_kf = P_pred * Ckf' \ (Ckf*P_pred*Ckf' + R);  % KF gain
+    K_kf = P_pred * Ckf / (Ckf'*P_pred*Ckf + Rkf);  % KF gain
     
-    x_upd = x_pred + K_kf * (psi_noisy - Ckf*x_pred);  % State corrector
-    P_upd = (eye(3) - K_kf*Ckf)*P_pred*(eye(3) - K_kf*Ckf)' + K_kf*R*K_kf';  % Covariance corrector
+    x_upd = x_pred + K_kf * (psi_noisy - Ckf'*x_pred);  % State corrector
+    P_upd = (eye(3) - K_kf.*Ckf')*P_pred*(eye(3) - K_kf.*Ckf')' + K_kf*Rkf*K_kf';  % Covariance corrector
     
     x_pred = Akf*x_upd + Bkf*delta;  % State predictor
-    P_pred = Akf*P_upd*Akf' + Ekf*Q*Ekf';  % Covariance predictor
+    P_pred = Akf*P_upd*Akf' + Ekf*Qkf*Ekf';  % Covariance predictor
     
     u_d = U_d;
     r_d = 0;
