@@ -107,8 +107,8 @@ Bu = @(u_r,delta) [ (1-t_thr)  -u_r^2 * X_delta2 * delta
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % rudder control law
-wb = 0.06;
-zeta = 1;
+wb = 0.03; % 0.06;
+zeta = 0.25; % 1;
 wn = 1 / sqrt( 1 - 2*zeta^2 + sqrt( 4*zeta^4 - 4*zeta^2 + 2) ) * wb;
 
 % linearized sway-yaw model (see (7.15)-(7.19) in Fossen (2021)) used
@@ -180,7 +180,7 @@ Rkf = s_r_psi^2;
 
 % s_q_psi = s_r_psi; % Standard deviation of heading plant model noise
 s_q_r = 0.0005; % Standard deviation of heading rate plant model noise
-s_q_b = 0.0001; % Standard deviation of rudder bias plant model noise
+s_q_b = 0.001; % Standard deviation of rudder bias plant model noise
 Qkf = [s_q_r^2 0; 0 s_q_b^2]; % Plant model noise covariance matrix
 
 Ac = [0 1 0; 0 -1/T_nomoto -K/T_nomoto; 0 0 0];
@@ -193,7 +193,7 @@ Cc = [1; 0; 0];
 Ckf = Cc;
 
 x_pred = [eta(3); nu(3); 0];
-P_pred = diag([0.1, 0.05, 0.01]);
+P_pred = diag([0.05^2, 0.01^2, 0.005^2]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% MAIN LOOP
@@ -299,10 +299,10 @@ for i=1:Ns+1
     xd_dot = Ad * xd + Bd * psi_ref;   % Eq. (12.11)
     
     % error signals (psi and r are measurements)
-    e_psi = ssa(eta(3) - xd(1));              % yaw angle error (rad)
-    e_r = nu(3) - xd(2);                      % yaw rate error (rad/s)
-%     e_psi = ssa(x_upd(1) - xd(1)); % Use estimate of yaw angle in feedback
-%     e_r = x_upd(2) - xd(2);  % Use estimate of yaw rate in feedback
+%     e_psi = ssa(eta(3) - xd(1));              % yaw angle error (rad)
+%     e_r = nu(3) - xd(2);                      % yaw rate error (rad/s)
+    e_psi = ssa(x_upd(1) - xd(1)); % Use estimate of yaw angle in feedback
+    e_r = x_upd(2) - xd(2);  % Use estimate of yaw rate in feedback
     
     % control law
     delta_c_unsat = -K_p*e_psi - K_i*integral_e_psi - K_d*e_r;              % unsaturated rudder angle command (rad)
