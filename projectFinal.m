@@ -175,7 +175,8 @@ yp_int = 0;
 % Initialisation for kalman filter
 s_r_psi = 0.5 * pi/180; % Standard deviation of heading measurement noise
 s_r_r = 0.1 * pi/180; % Standard deviation of heading rate measurement noise
-R = [s_r_psi^2 0; 0 s_r_r^2]; % Measurement noise covariance matrix
+% R = [s_r_psi^2 0; 0 s_r_r^2]; % Measurement noise covariance matrix
+R = s_r_psi^2;
 
 s_q_psi = s_r_psi; % Standard deviation of heading plant model noise
 s_q_r = s_r_r; % Standard deviation of heading rate plant model noise
@@ -185,11 +186,14 @@ Q = [s_q_psi 0 0; 0 s_r_r 0; 0 0 s_q_b]; % Plant model noise covariance matrix
 Ac = [0 1 0; 0 -1/T_nomoto -K/T_nomoto; 0 0 0];
 Bc = [0; K/T_nomoto; 0];
 Ec = [0 0; 1 0; 0 1];
-Cc = [1; 1; 0];
+Cc = [1; 0; 0]';
 
 [~, Bkf] = c2d(Ac,Bc,h);
 [Akf, Ekf] = c2d(Ac,Ec,h);
 Ckf = Cc;
+
+x_pred = [eta(3); nu(3); 0];
+P_pred = diag([0.1, 0.05, 0.01]);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MAIN LOOP
@@ -275,7 +279,19 @@ for i=1:Ns+1
 
     [course_ref, yp_int_dot]  = guidance(eta, startWp, endWp, pi_p, yp_int);
     psi_ref = course_ref; % Set heading to desired course
-        
+    
+    % Measurements
+    psi_noisy = eta(3) + normrnd(0, s_r_psi);
+    r_noisy = nu(3) + normrnd(0, s_r_r);
+    
+    K_kf = P_pred * Ckf' \ (Ckf*P_pred*Ckf' + R);  % KF gain
+    
+    x_upd = x_pred + K_kf * (psi_noisy - Ckf*x_pred);  % State corrector
+    P_upd = (eye(3) - K_kf*Ckf)*P_pred*(eye(3) - K_kf*Ckf)' + K_kf*R*K_kf';  % Covariance corrector
+    
+    x_pred = Akf*x_upd + Bkf*delta;  % State predictor
+    P_pred = Akf*P_upd*Akf' + Ekf*Q*Ekf';  % Covariance predictor
+    
     u_d = U_d;
     r_d = 0;
     
@@ -283,8 +299,10 @@ for i=1:Ns+1
     xd_dot = Ad * xd + Bd * psi_ref;   % Eq. (12.11)
     
     % error signals (psi and r are measurements)
-    e_psi = ssa(eta(3) - xd(1));              % yaw angle error (rad)
-    e_r = nu(3) - xd(2);                      % yaw rate error (rad/s)
+    %e_psi = ssa(eta(3) - xd(1));              % yaw angle error (rad)
+    %e_r = nu(3) - xd(2);                      % yaw rate error (rad/s)
+    e_psi = ssa(x_upd(1) - xd(1)); % Use estimate of yaw angle in feedback
+    e_r = x_upd(2) - xd(2);  % Use estimate of yaw rate in feedback
     
     % control law
     delta_c_unsat = -K_p*e_psi - K_i*integral_e_psi - K_d*e_r;              % unsaturated rudder angle command (rad)
@@ -326,10 +344,7 @@ for i=1:Ns+1
     
     beta = asin(nu_r(2) / sqrt( nu_r(1)^2 + nu_r(2)^2 + nu_r(3)^2 )); % Sideslip angle
     beta_c = atan2(nu(2), nu(1)); % Crab angle
-    course = eta(3) + beta_c;
-    
-    psi_noisy = eta(3) + normrnd(0, s_r_psi);
-    r_noisy = nu(3) + normrnd(0, s_r_r);
+    course = eta(3) + beta_c;    
     
     % store simulation data in a table (for testing)
     eta(3) = ssa(eta(3));
