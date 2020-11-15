@@ -450,14 +450,10 @@ hold off
 
 figure(7)
 subplot(211)
-plot(t, psi_n, '--', 'linewidth', 2);
-hold on
-plot(t, psi, 'linewidth', 2);
-hold off
+plot(t, psi_n, '--', t, psi, 'linewidth', 2);
 subplot(212)
-plot(t, r_n, '--', 'linewidth', 2);
-hold on
-plot(t, r, 'linewidth', 2);
-hold off
+plot(t, r_n, '--', t, r, 'linewidth', 2);
+
+
 
 
