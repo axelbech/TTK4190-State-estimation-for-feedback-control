@@ -166,32 +166,35 @@ numWps = length(WP);
 wpIdx = 2;
 wpDiff = endWp - startWp;
 pi_p = atan2(wpDiff(2), wpDiff(1));
+% crossTrackErr = crosstrackWpt(endWp(1), endWp(2), startWp(1), startWp(2), eta(1), eta(2));
+% dist2Wp = norm(endWp - eta(1:2));
+% alongTrackDist = sqrt(dist2Wp^2 - crossTrackErr^2);
+% K_p_path = 1 / (alongTrackDist/5 + 500);
 yp_int = 0;
 
 % Initialisation for kalman filter
-
-s_r_phi = 0.5 * pi/180; % Standard deviation of heading measurement noise
+s_r_psi = 0.5 * pi/180; % Standard deviation of heading measurement noise
 s_r_r = 0.1 * pi/180; % Standard deviation of heading rate measurement noise
-R = [s_r_phi^2 0; 0 s_r_r^2]; % Measurement noise covariance matrix
+R = [s_r_psi^2 0; 0 s_r_r^2]; % Measurement noise covariance matrix
 
-s_q_phi = s_r_phi; % Standard deviation of heading plant model noise
+s_q_psi = s_r_psi; % Standard deviation of heading plant model noise
 s_q_r = s_r_r; % Standard deviation of heading rate plant model noise
 s_q_b = 0.01; % Standard deviation of rudder bias plant model noise
-Q = [s_q_phi 0 0; 0 s_r_r 0; 0 0 s_q_b]; % Plant model noise covariance matrix
+Q = [s_q_psi 0 0; 0 s_r_r 0; 0 0 s_q_b]; % Plant model noise covariance matrix
 
-A = [0 1 0; 0 -1/T_nomoto -K/T_nomoto; 0 0 0];
-B = [0; K/T_nomoto; 0];
-E = [0 0; 1 0; 0 1];
-C = [1; 1; 0];
+Ac = [0 1 0; 0 -1/T_nomoto -K/T_nomoto; 0 0 0];
+Bc = [0; K/T_nomoto; 0];
+Ec = [0 0; 1 0; 0 1];
+Cc = [1; 1; 0];
 
-[~, Bd] = c2d(A,B,h);
-[Ad, Ed] = c2d(A,E,h);
-Cd = C;
+[~, Bkf] = c2d(Ac,Bc,h);
+[Akf, Ekf] = c2d(Ac,Ec,h);
+Ckf = Cc;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % MAIN LOOP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-simdata = zeros(Ns+1,20);                % table of simulation data
+simdata = zeros(Ns+1,22);                % table of simulation data
 
 for i=1:Ns+1
 
@@ -325,12 +328,12 @@ for i=1:Ns+1
     beta_c = atan2(nu(2), nu(1)); % Crab angle
     course = eta(3) + beta_c;
     
-    psi_noisy = eta(3) + normrnd(0, s_r_phi);
+    psi_noisy = eta(3) + normrnd(0, s_r_psi);
     r_noisy = nu(3) + normrnd(0, s_r_r);
     
     % store simulation data in a table (for testing)
     eta(3) = ssa(eta(3));
-    simdata(i,:) = [t n_d delta_c n delta eta' nu' u_d psi_ref r_d beta beta_c, e_psi, integral_e_psi, ssa(course), course_ref]; % psi_noisy, r_noisy];       
+    simdata(i,:) = [t n_d delta_c n delta eta' nu' u_d psi_ref r_d beta beta_c, e_psi, integral_e_psi, ssa(course), course_ref, psi_noisy, r_noisy];       
      
     % Euler integration
     eta = euler2(eta_dot,eta,h);
@@ -367,8 +370,8 @@ e_psi   = 180/pi * simdata(:,17);
 integral_e_psi = 180/pi * simdata(:,18);
 course = 180/pi * simdata(:,19);
 course_ref = 180/pi * simdata(:,20);
-psi_n = 180/pi *simdata(:,21);
-r_n = 180/pi *simdata(:,22);
+psi_n = 180/pi * simdata(:,21);
+r_n = 180/pi * simdata(:,22);
 
 figure(1)
 figure(gcf)
@@ -447,9 +450,14 @@ hold off
 
 figure(7)
 subplot(211)
-plot(t, psi_n, 'linewidth', 2);
+plot(t, psi, 'linewidth', 2);
+hold on
+plot(t, psi_n, 'linewidth', 2 , '--');
+hold off
 subplot(212)
-plot(t, r_n, 'linewidth', 2);
-title('Real vs noisy heading and heading rate');
+plot(t, r, 'linewidth', 2);
+hold on
+plot(t, r_n, 'linewidth', 2, '--');
+hold off
 
 
