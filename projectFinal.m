@@ -286,9 +286,11 @@ for i=1:Ns+1
     
     K_kf = P_pred * Ckf / (Ckf'*P_pred*Ckf + Rkf);  % KF gain
     
+    % KF update
     x_upd = x_pred + K_kf * (psi_noisy - Ckf'*x_pred);  % State corrector
     P_upd = (eye(3) - K_kf.*Ckf')*P_pred*(eye(3) - K_kf.*Ckf')' + K_kf*Rkf*K_kf';  % Covariance corrector
     
+    % KF predict
     x_pred = Akf*x_upd + Bkf*delta;  % State predictor
     P_pred = Akf*P_upd*Akf' + Ekf*Qkf*Ekf';  % Covariance predictor
     
@@ -478,6 +480,17 @@ plot(t, psi_est, t, psi, 'linewidth', 2);
 subplot(212)
 plot(t, r_est, t, r, 'linewidth', 2);
 
+
+figure(8)
+subplot(311);
+plot(t, delta_c, t, delta, 'linewidth', 2);
+title('Actual and commanded rudder angles (deg)'); xlabel('time (s)');
+subplot(312);
+plot(t, psi, t, psi_d, 'linewidth', 2);
+title('Actual and desired yaw angles (deg)'); xlabel('time (s)');
+subplot(313);
+plot(t, r, t, r_d, 'linewidth', 2);
+title('Actual and desired yaw rate (deg/s)'); xlabel('time (s)');
 
 
 
