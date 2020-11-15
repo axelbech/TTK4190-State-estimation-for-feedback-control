@@ -179,9 +179,9 @@ s_r_r = 0.1 * pi/180; % Standard deviation of heading rate measurement noise
 Rkf = s_r_psi^2;
 
 % s_q_psi = s_r_psi; % Standard deviation of heading plant model noise
-s_q_r = s_r_r; % Standard deviation of heading rate plant model noise
-s_q_b = 0.01; % Standard deviation of rudder bias plant model noise
-Qkf = [s_r_r 0; 0 s_q_b]; % Plant model noise covariance matrix
+s_q_r = 0.0005; % Standard deviation of heading rate plant model noise
+s_q_b = 0.0001; % Standard deviation of rudder bias plant model noise
+Qkf = [s_q_r^2 0; 0 s_q_b^2]; % Plant model noise covariance matrix
 
 Ac = [0 1 0; 0 -1/T_nomoto -K/T_nomoto; 0 0 0];
 Bc = [0; K/T_nomoto; 0];
@@ -198,7 +198,7 @@ P_pred = diag([0.1, 0.05, 0.01]);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% MAIN LOOP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-simdata = zeros(Ns+1,22);                % table of simulation data
+simdata = zeros(Ns+1,24);                % table of simulation data
 
 for i=1:Ns+1
 
@@ -299,10 +299,10 @@ for i=1:Ns+1
     xd_dot = Ad * xd + Bd * psi_ref;   % Eq. (12.11)
     
     % error signals (psi and r are measurements)
-    %e_psi = ssa(eta(3) - xd(1));              % yaw angle error (rad)
-    %e_r = nu(3) - xd(2);                      % yaw rate error (rad/s)
-    e_psi = ssa(x_upd(1) - xd(1)); % Use estimate of yaw angle in feedback
-    e_r = x_upd(2) - xd(2);  % Use estimate of yaw rate in feedback
+    e_psi = ssa(eta(3) - xd(1));              % yaw angle error (rad)
+    e_r = nu(3) - xd(2);                      % yaw rate error (rad/s)
+%     e_psi = ssa(x_upd(1) - xd(1)); % Use estimate of yaw angle in feedback
+%     e_r = x_upd(2) - xd(2);  % Use estimate of yaw rate in feedback
     
     % control law
     delta_c_unsat = -K_p*e_psi - K_i*integral_e_psi - K_d*e_r;              % unsaturated rudder angle command (rad)
@@ -347,8 +347,9 @@ for i=1:Ns+1
     course = eta(3) + beta_c;    
     
     % store simulation data in a table (for testing)
-    eta(3) = ssa(eta(3));
-    simdata(i,:) = [t n_d delta_c n delta eta' nu' u_d psi_ref r_d beta beta_c, e_psi, integral_e_psi, ssa(course), course_ref, psi_noisy, r_noisy];       
+    etaOut = eta;
+    etaOut(3) = ssa(etaOut(3));
+    simdata(i,:) = [t n_d delta_c n delta etaOut' nu' u_d psi_ref r_d beta beta_c, e_psi, integral_e_psi, ssa(course), course_ref, psi_noisy, r_noisy, ssa(x_upd(1)), x_upd(2)];       
      
     % Euler integration
     eta = euler2(eta_dot,eta,h);
@@ -387,6 +388,8 @@ course = 180/pi * simdata(:,19);
 course_ref = 180/pi * simdata(:,20);
 psi_n = 180/pi * simdata(:,21);
 r_n = 180/pi * simdata(:,22);
+psi_est = 180/pi * simdata(:,23);
+r_est = 180/pi * simdata(:,24);
 
 figure(1)
 figure(gcf)
@@ -463,11 +466,18 @@ end
 title('North-East positions (m)');
 hold off
 
+% figure(7)
+% subplot(211)
+% plot(t, psi_n, '--', t, psi, 'linewidth', 2);
+% subplot(212)
+% plot(t, r_n, '--', t, r, 'linewidth', 2);
+
 figure(7)
 subplot(211)
-plot(t, psi_n, '--', t, psi, 'linewidth', 2);
+plot(t, psi_est, t, psi, 'linewidth', 2);
 subplot(212)
-plot(t, r_n, '--', t, r, 'linewidth', 2);
+plot(t, r_est, t, r, 'linewidth', 2);
+
 
 
 
